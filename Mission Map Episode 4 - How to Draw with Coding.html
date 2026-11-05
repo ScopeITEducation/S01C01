@@ -6,13 +6,16 @@
 <meta name="author" content="Scoper Cy">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <title>Mission Map — Episode 4: How to Draw with Coding</title>
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Open+Sans:wght@400;600;700;800&display=swap" rel="stylesheet">
-<script src="https://cdnjs.cloudflare.com/ajax/libs/blockly/13.2.1/blockly_compressed.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/blockly/13.2.1/blocks_compressed.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/blockly/13.2.1/msg/en.js"></script>
+<script src="blockly/blockly_compressed.js"></script>
+<script src="blockly/blocks_compressed.js"></script>
+<script src="blockly/offline_audio.js"></script>
+<script src="blockly/msg/en.js"></script>
 <style>
+-face{font-family:"Open Sans";font-style:normal;font-weight:400;font-display:swap;src:url("fonts/OpenSans-Regular.ttf") format("truetype");}
+-face{font-family:"Open Sans";font-style:normal;font-weight:600;font-display:swap;src:url("fonts/OpenSans-SemiBold.ttf") format("truetype");}
+-face{font-family:"Open Sans";font-style:normal;font-weight:700;font-display:swap;src:url("fonts/OpenSans-Bold.ttf") format("truetype");}
+-face{font-family:"Open Sans";font-style:normal;font-weight:800;font-display:swap;src:url("fonts/OpenSans-ExtraBold.ttf") format("truetype");}
+
   
   :root{
     --sky:#dbe4ed;
@@ -480,9 +483,10 @@
             scrollbars: true,
             zoom: { controls: false, wheel: false, startScale: 0.95 },
             move: { scrollbars: true, wheel: false, drag: true },
-            media: 'https://cdnjs.cloudflare.com/ajax/libs/blockly/13.2.1/media/',
+            media: 'blockly/media/',
             grid: { spacing: 22, length: 2, colour: '#dfe3f7', snap: true }
         });
+        ScopeITOfflineAudio.load(workspace);
         workspace.addChangeListener(updateBlockCounter);
         blocklyReady = true;
     }
@@ -597,42 +601,57 @@
           ${stepDots}
           <circle class="start-dot" cx="${cx}" cy="${cy}" r="7"></circle>
           <path class="drawn-path" id="drawnPath" d=""></path>
-          <image class="turtle-svg-icon" id="turtleIcon" href="${ROBOT_BACK}"
+          <image class="turtle-svg-icon" id="turtleIcon" href="${robotSourceForFacing(initialFacingForPuzzle(p))}"
                  width="${ICON_SIZE}" height="${ICON_SIZE}"
                  x="${cx - ICON_SIZE / 2}" y="${cy - ICON_SIZE / 2}"></image>
         </svg>
       </div>
     `;
-        positionTurtle(0, 0, p.startHeading || 0, true);
+        positionTurtle(0, 0, p.startHeading || 0, true, initialFacingForPuzzle(p));
     }
     let canvasOffset = { x: 0, y: 0 };
     let currentTargetPts = [];
     let turtleFacing = 'back';
-    function positionTurtle(x, y, heading, instant) {
+    function robotSourceForFacing(facing) {
+        return facing === 'right' ? ROBOT_RIGHT : (facing === 'left' ? ROBOT_LEFT : (facing === 'front' ? ROBOT_FRONT : ROBOT_BACK));
+    }
+    function facingForHeading(heading) {
+        const horiz = Math.sin(heading * Math.PI / 180);
+        const vert = Math.cos(heading * Math.PI / 180);
+        if (horiz > 0.35)
+            return 'right';
+        if (horiz < -0.35)
+            return 'left';
+        if (vert > 0.35)
+            return 'back';
+        return 'front';
+    }
+    function initialFacingForPuzzle(p) {
+        let heading = p.startHeading || 0;
+        for (const action of p.actions) {
+            if (action === 'move_forward')
+                break;
+            if (TURN_DELTA[action] !== undefined)
+                heading = (heading + TURN_DELTA[action] + 360) % 360;
+        }
+        return facingForHeading(heading);
+    }
+    function positionTurtle(x, y, heading, instant, initialFacing) {
         const icon = document.getElementById('turtleIcon');
         if (!icon)
             return;
         if (instant) {
             icon.style.transition = 'none';
-            turtleFacing = 'front';
+            turtleFacing = initialFacing || facingForHeading(heading);
         }
         else {
             icon.style.transition = '';
         }
         const prevFacing = turtleFacing;
         if (!instant) {
-            const horiz = Math.sin(heading * Math.PI / 180);
-            const vert = Math.cos(heading * Math.PI / 180);
-            if (horiz > 0.35)
-                turtleFacing = 'right';
-            else if (horiz < -0.35)
-                turtleFacing = 'left';
-            else if (vert > 0.35)
-                turtleFacing = 'back';
-            else
-                turtleFacing = 'front';
+            turtleFacing = facingForHeading(heading);
         }
-        const href = turtleFacing === 'right' ? ROBOT_RIGHT : (turtleFacing === 'left' ? ROBOT_LEFT : (turtleFacing === 'front' ? ROBOT_FRONT : ROBOT_BACK));
+        const href = robotSourceForFacing(turtleFacing);
         if (icon.getAttribute('data-facing') !== turtleFacing) {
             icon.setAttribute('href', href);
             icon.setAttribute('data-facing', turtleFacing);
